@@ -2,6 +2,7 @@ package spark
 
 import java.lang
 
+import com.alibaba.fastjson.JSON
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -9,7 +10,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.InputDStream
 import org.apache.spark.streaming.kafka010.{ConsumerStrategies, HasOffsetRanges, KafkaUtils, LocationStrategies}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import utils.{JedisConnectionPool, JedisOffset}
+import utils.{Difftime, JedisConnectionPool, JedisOffset, KpiTools}
 
 /**
   * Redis管理Offset
@@ -71,8 +72,38 @@ object KafkaRedisOffset {
     stream.foreachRDD({
       rdd=>
         val offestRange = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
-        // 业务处理
-        rdd.map(_.value()).foreach(println)
+        // 业务处理,json数据解析
+        val data = rdd.map(_.value()).map(t => JSON.parseObject(t))
+          //过滤支付通知数据
+          .filter(_.getString("serviceName").equalsIgnoreCase("reChargeNotifyReq"))
+          .map(t => {
+            //判断是否充值成功
+            val res = t.getString("bussinessRst")
+            //如果充值成功，获取充值金额
+            val money:Double = if(res.equals("0000")) t.getDouble("chargefee") else 0.0
+            //充值成功数
+            val feecount = if(res.equals("0000")) 1 else 0
+            //开始充值时间
+            val starttime = t.getString("requestId")
+            val day = starttime.substring(0,8)
+            val hour = starttime.substring(8,10)
+            val minute = starttime.substring(10,12)
+            //结束充值时间
+            val stoptime = t.getString("receiveNotifyTime")
+            //省份
+            val provinceCode = t.getString("provinceCode")
+            //时间差，时长
+            val diftime = Difftime.difftime(starttime,stoptime)
+            //（日期，小时，kpi（订单，成功订单，订单金额，订单时长），省份，分钟数）
+            (day,hour,List[Double](1,feecount,money,diftime),provinceCode,minute)
+          })
+
+        /**
+          * 业务概况（总订单量，成功订单量，总金额，总花费时长）
+          */
+        KpiTools.kpi_general(data)
+
+
 
         // 将偏移量进行更新
         val jedis = JedisConnectionPool.getConnection()
