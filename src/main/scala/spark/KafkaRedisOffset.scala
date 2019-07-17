@@ -6,11 +6,15 @@ import com.alibaba.fastjson.JSON
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.SparkConf
+import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.InputDStream
 import org.apache.spark.streaming.kafka010.{ConsumerStrategies, HasOffsetRanges, KafkaUtils, LocationStrategies}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import utils.{Difftime, JedisConnectionPool, JedisOffset, KpiTools}
+
+import scala.collection.mutable
 
 /**
   * Redis管理Offset
@@ -22,7 +26,17 @@ object KafkaRedisOffset {
       .set("spark.streaming.kafka.maxRatePerPartition","100")
       // 设置序列化机制
       .set("spark.serlizer","org.apache.spark.serializer.KryoSerializer")
-    val ssc = new StreamingContext(conf,Seconds(3))
+    val ssc = new StreamingContext(conf,Seconds(10))
+    val sc = new SparkContext(conf)
+    //将city文件进行广播
+    val file = sc.textFile("E:\\学习\\spark\\项目（二）01\\充值平台实时统计分析\\city.txt")
+    val pair: RDD[(String, String)] = file.map(t => {
+      val map = new mutable.HashMap[String,String]()
+      val code = t.split("\\s")(0)
+      val pro = t.split("\\s")(1)
+      (code, pro)
+    })
+    val probroad: Broadcast[Array[(String, String)]] = sc.broadcast(pair.collect())
     // 配置参数
     // 配置基本参数
     // 组名
@@ -103,6 +117,13 @@ object KafkaRedisOffset {
           */
         KpiTools.kpi_general(data)
 
+        KpiTools.kpi_general_min(data)
+
+        KpiTools.kpi_general_hour(data)
+
+        KpiTools.kpi_general_top(data,probroad)
+
+        KpiTools.kpi_general_hourCounts(data)
 
 
         // 将偏移量进行更新
