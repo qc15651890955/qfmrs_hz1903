@@ -27,16 +27,15 @@ object KafkaRedisOffset {
       // 设置序列化机制
       .set("spark.serlizer","org.apache.spark.serializer.KryoSerializer")
     val ssc = new StreamingContext(conf,Seconds(10))
-    val sc = new SparkContext(conf)
     //将city文件进行广播
-    val file = sc.textFile("E:\\学习\\spark\\项目（二）01\\充值平台实时统计分析\\city.txt")
+    val file = ssc.sparkContext.textFile("E:\\学习\\spark\\项目（二）01\\充值平台实时统计分析\\city.txt")
     val pair: RDD[(String, String)] = file.map(t => {
       val map = new mutable.HashMap[String,String]()
       val code = t.split("\\s")(0)
       val pro = t.split("\\s")(1)
       (code, pro)
     })
-    val probroad: Broadcast[Array[(String, String)]] = sc.broadcast(pair.collect())
+    val probroad: Broadcast[Array[(String, String)]] = ssc.sparkContext.broadcast(pair.collect())
     // 配置参数
     // 配置基本参数
     // 组名

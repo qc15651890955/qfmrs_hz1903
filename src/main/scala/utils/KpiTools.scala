@@ -55,7 +55,8 @@ object KpiTools {
         partition.foreach(f => {
           val sql = "insert into prohour(pro,hour,counts)" + "values('"+ f._1._1 + "','"+ f._1._3 + "','" + (f._2(0)-f._2(1)) + "')"
           val statement = connection.createStatement()
-          statement.executeUpdate(sql)
+          val i = statement.executeUpdate(sql)
+          if(i > 0) println("插入成功")
         })
         ConnectPoolUtils.resultConn(connection)
       })
@@ -74,7 +75,8 @@ object KpiTools {
           val percent:Double = x._2(1) / x._2(0)
           val sql = "insert into protop(code,pro,precent)" + "values('" + code + "','" + x._1 + "','" + percent + "')"
           val statement = connection.createStatement()
-          statement.executeUpdate(sql)
+          val i = statement.executeUpdate(sql)
+          if(i > 0) println("插入成功")
         })
       ConnectPoolUtils.resultConn(connection)
   }
@@ -89,9 +91,10 @@ object KpiTools {
         .foreachPartition(partition => {
           val connection = ConnectPoolUtils.getConnections()
           partition.foreach(f => {
-            val sql = "insert into hourCounts(date,hour,counts,money)" + "values('" + f._1._1 + "','" + f._1._2 + "','" + f._2(0) + "','" + f._2(2) + "')"
+            val sql = "insert into hourCounts(day,hour,counts,money)" + "values('" + f._1._1 + "','" + f._1._2 + "','" + f._2(0) + "','" + f._2(2) + "')"
             val statement = connection.createStatement()
-            statement.executeUpdate(sql)
+            val i = statement.executeUpdate(sql)
+            if(i > 0) println("插入成功")
           })
           ConnectPoolUtils.resultConn(connection)
         })
